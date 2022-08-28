@@ -1,72 +1,95 @@
 const express = require('express');
-const bodyParser = require ('body-parser');
+const bodyParser = require('body-parser');
 const { response } = require('express');
+const fs = require('fs');
 
+// Upload de arquivo
+const busboy = require("connect-busboy");
+// Leitura csv
+const { parse } = require("csv-parse");
 
 const db = require("./db");
 const cors = require('cors');
 const app = express();
 app.use(bodyParser.json());
-
+// O CORS é uma especificação do W3C 
+// e faz uso de headers do HTTP para informar 
+// aos navegadores se determinado recurso pode ser ou não acessado
 app.use(cors({
     origin: '*'
 }));
-
-app.get("/stock", (req, res)=>{
-    const response=[
-        {
-            "close": 56.06,
-            "date": "03/18/2022",
-            "high": 56.28,
-            "low": 54.02,
-            "open": 54.19,
-            "status": "Bom",
-            "volume": "179,189"
-          },
-          {
-            "close": 54.13,
-            "date": "03/17/2022",
-            "high": 54.9,
-            "low": 54.05,
-            "open": 54.49,
-            "status": "Bom",
-            "volume": "100,218"
-          },
-          {
-            "close": 54.65,
-            "date": "03/16/2022",
-            "high": 54.75,
-            "low": 53.53,
-            "open": 53.99,
-            "status": "Bom",
-            "volume": "123,044"
+// request: Requisicao
+// Response: Resposta
+app.get("/stock", (request, response) => {
+    const listar = async function () {
+        const results = await db.selectStock();
+        for (const item of results) { 
+            let status="";
+            const vol= item.volume;
+            if (vol>140){
+                item["status"]="otimo";
+            }else if (vol>100 && vol<140){
+                item["status"]="bom";
+            }else if(vol<100){
+                item["status"]="critico";
+            }           
           }
-    ]
-    res.status(200).send(response);
-})
-app.post("/stock", (req, res) => {
-    const response =req.body;
-    response['id']=2
-    res.status(200).send(response);
-})
-
-app.get("/cliente",(req, res) => {
-    const listar = async function() {
-        const result = await  db.selectCliente();;
-        res.status(200).send(result);
-     };
+        response.status(200).send(results);
+    };
     listar();
-})
+});
+
+app.post("/stock", (req, res) => {
+    const response = req.body;
+    response['id'] =
+        res.status(200).send(response);
+});
 
 
-app.post("/cliente",(req, res) => {
-    const cliente = req.body;
-    const inserir = async function(c) {
-        const result = await  db.insertCliente(c);;
-        res.status(201).send(result);
-     };
-     inserir(cliente);
-})
+app.use(busboy());
+app.post("/stock/upload", function (req, res) {
+    if (req.busboy) {
+        req.busboy.on("file", function (fieldName, fileStream, fileName, encoding, mimeType) {
+            fileStream.pipe(parse({ delimiter: ",", from_line: 2 }))
+                .on("data", function (row) {
+
+                    // Date,Open,High,Low,Close,Volume
+                    let dt = new Date(row[0]);
+                    let strDt = dt.toISOString().split("T")[0];
+
+                    let item = {
+                        "close": row[4],
+                        "date": strDt,
+                        "high": row[2],
+                        "low": row[3],
+                        "open": row[1],
+                        "volume": row[5]
+                     };
+
+                    const inserir = async function (stock_json) {
+                        const result = await db.insertStock(stock_json);
+                    };
+                    console.log(item)
+                    inserir(item);
+                })
+                .on("end", function () {
+                    console.log("finished");
+                    res.send('upload succeeded!');
+                })
+                .on("error", function (error) {
+                    console.log("Erro");
+                    console.log(error.message);
+                    res.status(500).send('Arquivo invalido:'+error.message);
+                });
+
+
+        });
+        return req.pipe(req.busboy);
+    }
+    //Something went wrong -- busboy was not loaded
+});
+
+app.use(busboy({ immediate: true }));
 
 
 app.listen(3001, () => {

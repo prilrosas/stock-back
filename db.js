@@ -3,7 +3,8 @@ async function connect(){
         return global.connection;
 
     const mysql = require("mysql2/promise");
-                                              //     mysql://usuario:senha@IP:PORTA/BANCO"
+     // require: importação de nodejs
+    //     mysql://usuario:senha@IP:PORTA/BANCO"
 
     const connection = await mysql.createConnection("mysql://root:adminadmin@localhost:3306/stock_schema");
     console.log("Conectou no MySQL!");
@@ -12,17 +13,17 @@ async function connect(){
 }
 
 
-async function selectCliente(){
+async function selectStock(){
     const conn = await connect();
-    const [rows] = await conn.query('SELECT * FROM cliente;');
+    const [rows] = await conn.query('SELECT * FROM stock;');
     return rows;
 }
 
-async function insertCliente(cliente){
+async function insertStock(stock){
     const conn = await connect();
-    const sql = 'INSERT INTO cliente(nome,idade) VALUES (?,?);';
-    const values = [cliente.nome, cliente.idade];
+    const sql = 'INSERT INTO stock (close, date, high, low,open, volume) VALUES (?,?,?,?,?,?);';
+    const values = [stock.close, stock.date, stock.high, stock.low,stock.open, stock.volume];
     return await conn.query(sql, values);
 }
 
-module.exports = {selectCliente,insertCliente}
+module.exports = {selectStock,insertStock}
